@@ -1,0 +1,53 @@
+version: '4.2'
+services:
+    product:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        ports:
+            - "8000:8000"
+        volumes:
+            - .:/app
+        command: 'php artisan serve --host=0.0.0.0 && php artisan queue:work --tries=3'
+        depends_on:
+            - product_db
+            - kafka
+
+    product_db:
+        image: mysql
+        restart: always
+        environment:
+            MYSQL_DATABASE: product
+            MYSQL_USER: laravel
+            MYSQL_PASSWORD: laravel
+            MYSQL_ROOT_PASSWORD: laravel
+        volumes:
+            - ./storage/dbdata:/var/lib/mysql
+        ports:
+            - "33063:3306"
+
+
+    zookeeper:
+        image: confluentinc/cp-zookeeper:latest
+        environment:
+            ZOOKEEPER_CLIENT_PORT: 2181
+        ports:
+            - "2185:2181"
+        volumes:
+            - "./storage/zookeeper/data:/var/lib/zookeeper/data"
+            - "./storage/zookeeper/log:/var/lib/zookeeper/log"
+            - "./storage/zookeeper/secrets:/var/lib/zookeeper/secrets"
+
+    kafka:
+        image: confluentinc/cp-kafka:latest
+        depends_on:
+            - zookeeper
+        ports:
+            - "29092:29092"
+        environment:
+            KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+        volumes:
+            - "./storage/kafka/data:/var/lib/kafka/data"
+            - "./storage/kafka/secrets:/var/lib/kafka/secrets"
